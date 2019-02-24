@@ -103,6 +103,7 @@
 
 
 (defun spacemacs-layouts/post-init-helm ()
+  (spacemacs||set-helm-key "l" spacemacs/layouts-transient-state/body)
   (spacemacs/set-leader-keys
     "bB" 'spacemacs-layouts/non-restricted-buffer-list-helm
     "pl" 'spacemacs/helm-persp-switch-project))
@@ -119,7 +120,8 @@
   (use-package persp-mode
     :init
     (progn
-      (setq persp-auto-resume-time (if (or dotspacemacs-auto-resume-layouts
+      (setq persp-add-buffer-on-after-change-major-mode 'free
+            persp-auto-resume-time (if (or dotspacemacs-auto-resume-layouts
                                            spacemacs-force-resume-layouts)
                                        1 -1)
             persp-is-ibc-as-f-supported nil
@@ -129,12 +131,6 @@
             persp-save-dir spacemacs-layouts-directory
             persp-set-ido-hooks t)
 
-      (defun spacemacs//activate-persp-mode ()
-        "Always activate persp-mode, unless it is already active.
- (e.g. don't re-activate during `dotspacemacs/sync-configuration-layers' -
- see issues #5925 and #3875)"
-        (unless (bound-and-true-p persp-mode)
-          (persp-mode)))
       (spacemacs/defer-until-after-user-config #'spacemacs//activate-persp-mode)
 
       ;; layouts transient state
@@ -224,7 +220,7 @@
       (defadvice persp-activate (before spacemacs//save-toggle-layout activate)
         (setq spacemacs--last-selected-layout persp-last-persp-name))
       (add-hook 'persp-mode-hook 'spacemacs//layout-autosave)
-      (spacemacs/declare-prefix "b" "persp-buffers")
+      (advice-add 'persp-load-state-from-file :before 'spacemacs//layout-wait-for-modeline)
       ;; Override SPC TAB to only change buffers in perspective
       (spacemacs/set-leader-keys
         "ba"   'persp-add-buffer

@@ -12,30 +12,32 @@
 (setq spacemacs-editing-visual-packages
       '(
         ;; default
-        adaptive-wrap
-        (centered-buffer-mode :location local)
-        column-enforce-mode
         (hide-comnt :location local)
+        ;; see https://github.com/syl20bnr/spacemacs/issues/2529
+        ;; waiting for an overlay bug to be fixed
+        (hl-anything :excluded t)
+        column-enforce-mode
         highlight-indentation
         highlight-numbers
         highlight-parentheses
-        ;; waiting for an overlay bug to be fixed
-        ;; see https://github.com/syl20bnr/spacemacs/issues/2529
-        (hl-anything :excluded t)
         indent-guide
         rainbow-delimiters
         volatile-highlights
+        writeroom-mode
         ))
 
 ;; Initialization of packages
 
-(defun spacemacs-editing-visual/init-adaptive-wrap ()
-  (use-package adaptive-wrap
-    :config
-    (progn
-      (add-hook 'visual-line-mode-hook 'adaptive-wrap-prefix-mode))))
-
-(defun spacemacs-editing-visual/init-centered-buffer-mode ())
+(defun spacemacs-editing-visual/init-writeroom-mode ()
+  (use-package writeroom-mode
+    :defer t
+    :init
+    (spacemacs|define-transient-state centered-buffer-mode
+      :title "Centered buffer Transient State"
+      :bindings
+      ("[" writeroom-decrease-width "shrink")
+      ("]" writeroom-increase-width "enlarge")
+      ("=" writeroom-adjust-width "adjust width"))))
 
 (defun spacemacs-editing-visual/init-column-enforce-mode ()
   (use-package column-enforce-mode
@@ -152,8 +154,10 @@
 
 (defun spacemacs-editing-visual/init-volatile-highlights ()
   (use-package volatile-highlights
+    :defer (spacemacs/defer 2)
     :config
     (progn
+      (require 'volatile-highlights)
       ;; additional extensions
       ;; evil
       (vhl/define-extension 'evil

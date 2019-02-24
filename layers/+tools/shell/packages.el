@@ -117,12 +117,12 @@
 
       ;; Visual commands
       (require 'em-term)
-      (mapc (lambda (x) (push x eshell-visual-commands))
+      (mapc (lambda (x) (add-to-list 'eshell-visual-commands x))
             '("el" "elinks" "htop" "less" "ssh" "tmux" "top"))
 
       ;; automatically truncate buffer after output
       (when (boundp 'eshell-output-filter-functions)
-        (push 'eshell-truncate-buffer eshell-output-filter-functions)))))
+        (add-hook 'eshell-output-filter-functions #'eshell-truncate-buffer)))))
 
 (defun shell/init-eshell-prompt-extras ()
   (use-package eshell-prompt-extras
@@ -175,7 +175,8 @@
 (defun shell/post-init-projectile ()
   (spacemacs/set-leader-keys
     "p'" 'spacemacs/projectile-shell-pop
-    "p$t" 'projectile-multi-term-in-root))
+    "p$t" 'projectile-multi-term-in-root)
+  (spacemacs/declare-prefix "p$" "projects/shell"))
 
 (defun shell/init-shell ()
   (spacemacs/register-repl 'shell 'shell)
@@ -188,7 +189,8 @@
              ;; Check for clear command and execute it.
              ((string-match "^[ \t]*clear[ \t]*$" command)
               (comint-send-string proc "\n")
-              (erase-buffer))
+              (let ((inhibit-read-only  t))
+                (erase-buffer)))
              ;; Check for man command and execute it.
              ((string-match "^[ \t]*man[ \t]*" command)
               (comint-send-string proc "\n")
@@ -212,10 +214,10 @@
             shell-pop-term-shell      shell-default-term-shell
             shell-pop-full-span       shell-default-full-span)
       (make-shell-pop-command eshell)
-      (make-shell-pop-command shell)
       (make-shell-pop-command term shell-pop-term-shell)
-      (make-shell-pop-command multiterm)
       (make-shell-pop-command ansi-term shell-pop-term-shell)
+      (make-shell-pop-command inferior-shell)
+      (make-shell-pop-command multiterm)
 
       (add-hook 'term-mode-hook 'ansi-term-handle-close)
       (add-hook 'term-mode-hook (lambda () (linum-mode -1)))
@@ -223,10 +225,12 @@
       (spacemacs/set-leader-keys
         "'"   'spacemacs/default-pop-shell
         "ase" 'spacemacs/shell-pop-eshell
-        "asi" 'spacemacs/shell-pop-shell
+        "asi" 'spacemacs/shell-pop-inferior-shell
         "asm" 'spacemacs/shell-pop-multiterm
         "ast" 'spacemacs/shell-pop-ansi-term
-        "asT" 'spacemacs/shell-pop-term))))
+        "asT" 'spacemacs/shell-pop-term)
+      (spacemacs/declare-prefix "'" "open shell")
+      (spacemacs/declare-prefix "as" "shells"))))
 
 (defun shell/init-term ()
   (spacemacs/register-repl 'term 'term)

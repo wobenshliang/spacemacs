@@ -18,16 +18,14 @@
         (bind-key :step bootstrap)
         (diminish :step bootstrap)
         (evil :step bootstrap)
-        (exec-path-from-shell :step bootstrap
-                              :toggle (or (spacemacs/system-is-mac)
-                                          (spacemacs/system-is-linux)
-                                          (eq window-system 'x)))
         (hydra :step bootstrap)
         (use-package :step bootstrap)
         (which-key :step bootstrap)
         ;; pre packages, initialized aftert the bootstrap packages
         ;; these packages can use use-package
+        (dotenv-mode :step pre)
         (evil-evilified-state :location local :step pre :protected t)
+        (pcre2el :step pre)
         (holy-mode :location local :step pre)
         (hybrid-mode :location local :step pre)
         (spacemacs-theme :location built-in)
@@ -43,6 +41,10 @@
 (defun spacemacs-bootstrap/init-diminish ()
   (when (not (configuration-layer/package-used-p 'spaceline))
     (add-hook 'after-load-functions 'spacemacs/diminish-hook)))
+
+(defun spacemacs-bootstrap/init-dotenv-mode ()
+  (use-package dotenv-mode
+    :defer t))
 
 (defun spacemacs-bootstrap/init-bind-map ()
   (require 'bind-map)
@@ -66,7 +68,7 @@
   (evil-mode 1)
 
   ;; Use evil as a default jump handler
-  (push 'evil-goto-definition spacemacs-default-jump-handlers)
+  (add-to-list 'spacemacs-default-jump-handlers 'evil-goto-definition)
 
   (require 'cl)
   ;; State cursors
@@ -78,10 +80,10 @@
   (define-key evil-normal-state-map (kbd dotspacemacs-ex-command-key) 'evil-ex)
   (define-key evil-visual-state-map (kbd dotspacemacs-ex-command-key) 'evil-ex)
   (define-key evil-motion-state-map (kbd dotspacemacs-ex-command-key) 'evil-ex)
-  (setq evil-ex-substitute-global dotspacemacs-ex-substitute-global)
+  (setq evil-ex-substitute-global vim-style-ex-substitute-global)
 
   ;; evil-want-Y-yank-to-eol must be set via customize to have an effect
-  (customize-set-variable 'evil-want-Y-yank-to-eol dotspacemacs-remap-Y-to-y$)
+  (customize-set-variable 'evil-want-Y-yank-to-eol vim-style-remap-Y-to-y$)
 
   ;; bind evil-jump-forward for GUI only.
   (define-key evil-motion-state-map [C-i] 'evil-jump-forward)
@@ -96,7 +98,9 @@
   (define-key evil-window-map (kbd "<right>") 'evil-window-right)
   (define-key evil-window-map (kbd "<up>") 'evil-window-up)
   (define-key evil-window-map (kbd "<down>") 'evil-window-down)
-  (spacemacs/set-leader-keys "re" 'evil-show-registers)
+  (spacemacs/set-leader-keys
+    "re" 'evil-show-registers
+    "sc" 'spacemacs/evil-search-clear-highlight)
   ;; motions keys for help buffers
   (evil-define-key 'motion help-mode-map (kbd "<escape>") 'quit-window)
   (evil-define-key 'motion help-mode-map (kbd "<tab>") 'forward-button)
@@ -113,12 +117,12 @@
   (add-hook 'after-change-major-mode-hook 'spacemacs//set-evil-shift-width 'append)
 
   ;; Keep the region active when shifting
-  (when dotspacemacs-retain-visual-state-on-shift
+  (when vim-style-retain-visual-state-on-shift
     (evil-map visual "<" "<gv")
     (evil-map visual ">" ">gv"))
 
   ;; move selection up and down
-  (when dotspacemacs-visual-line-move-text
+  (when vim-style-visual-line-move-text
     (define-key evil-visual-state-map "J" (concat ":m '>+1" (kbd "RET") "gv=gv"))
     (define-key evil-visual-state-map "K" (concat ":m '<-2" (kbd "RET") "gv=gv")))
 
@@ -246,7 +250,7 @@
   (spacemacs|define-text-object "“" "double-quotation-mark" "“" "”")
   (evil-define-text-object evil-pasted (count &rest args)
     (list (save-excursion (evil-goto-mark ?\[) (point))
-          (save-excursion (evil-goto-mark ?\]) (point))))
+          (save-excursion (evil-goto-mark ?\]) (1+ (point)))))
   (define-key evil-inner-text-objects-map "P" 'evil-pasted)
   ;; define text-object for entire buffer
   (evil-define-text-object evil-inner-buffer (count &optional beg end type)
@@ -254,7 +258,7 @@
   (define-key evil-inner-text-objects-map "g" 'evil-inner-buffer)
 
   ;; turn off evil in corelv buffers
-  (push '("\\*LV\\*") evil-buffer-regexps)
+  (add-to-list 'evil-buffer-regexps '("\\*LV\\*"))
 
   ;; replace `dired-goto-file' with `helm-find-files', since `helm-find-files'
   ;; can do the same thing and with fuzzy matching and other features.
@@ -285,10 +289,6 @@
   (evil-declare-ignore-repeat 'spacemacs/next-error)
   (evil-declare-ignore-repeat 'spacemacs/previous-error))
 
-(defun spacemacs-bootstrap/init-exec-path-from-shell ()
-  (require 'exec-path-from-shell)
-  (exec-path-from-shell-initialize))
-
 (defun spacemacs-bootstrap/init-hydra ()
   (require 'hydra)
   (setq hydra-key-doc-function 'spacemacs//hydra-key-doc-function
@@ -304,6 +304,17 @@
 (defun spacemacs-bootstrap/init-which-key ()
   (require 'which-key)
 
+  (setq which-key-special-keys nil
+        which-key-use-C-h-for-paging t
+        which-key-prevent-C-h-from-cycling t
+        which-key-echo-keystrokes 0.02
+        which-key-max-description-length 32
+        which-key-allow-multiple-replacements t
+        which-key-sort-order 'which-key-key-order-alpha
+        which-key-idle-delay dotspacemacs-which-key-delay
+        which-key-idle-secondary-delay 0.01
+        which-key-allow-evil-operators t)
+
   (spacemacs|add-toggle which-key
     :mode which-key-mode
     :documentation
@@ -314,34 +325,25 @@
 
   ;; Needed to avoid nil variable error before update to recent which-key
   (defvar which-key-replacement-alist nil)
+  ;; Reset to the default or customized value before adding our values in order
+  ;; to make this initialization code idempotent.
+  (custom-reevaluate-setting 'which-key-replacement-alist)
   ;; Replace rules for better naming of functions
   (let ((new-descriptions
          ;; being higher in this list means the replacement is applied later
          '(
            ("spacemacs/\\(.+\\)" . "\\1")
+           ("spacemacs-\\(.+\\)" . "\\1")
            ("spacemacs/toggle-\\(.+\\)" . "\\1")
-           ("spacemacs/alternate-buffer" . "last buffer")
+           ("\\(.+\\)-transient-state/\\(.+\\)" . "\\2")
+           ("\\(.+\\)-transient-state/body" . "\\1-transient-state")
+           ("spacemacs-layouts/non-restricted-buffer-list-\\(helm\\|ivy\\)" . "global-list-buffers")
            ("spacemacs/toggle-mode-line-\\(.+\\)" . "\\1")
-           ("avy-goto-word-or-subword-1" . "avy word")
-           ("shell-command" . "shell cmd")
-           ("spacemacs/default-pop-shell" . "open shell")
-           ("spacemacs/helm-project-smart-do-search-region-or-symbol" . "smart search w/input")
-           ("spacemacs/helm-project-smart-do-search" . "smart search")
-           ("spacemacs/search-project-auto-region-or-symbol" . "search project w/input")
-           ("spacemacs/search-project-auto" . "search project")
-           ("helm-descbinds" . "show keybindings")
-           ("sp-split-sexp" . "split sexp")
-           ("avy-goto-line" . "avy line")
-           ("universal-argument" . "universal arg")
-           ("er/expand-region" . "expand region")
-           ("helm-apropos" . "apropos")
-           ("spacemacs/toggle-hybrid-mode" . "hybrid (hybrid-mode)")
-           ("spacemacs/toggle-holy-mode" . "emacs (holy-mode)")
            ("evil-lisp-state-\\(.+\\)" . "\\1")
-           ("spacemacs/\\(.+\\)-transient-state/\\(.+\\)" . "\\2")
-           ("spacemacs/\\(.+\\)-transient-state/body" . "\\1-transient-state")
            ("helm-mini\\|ivy-switch-buffer" . "list-buffers")
-           ("spacemacs-layouts/non-restricted-buffer-list-\\(helm\\|ivy\\)" . "global-list-buffers"))))
+           ("lazy-helm/\\(.+\\)" . "\\1")
+           ("lazy-helm/spacemacs/\\(.+\\)" . "\\1")
+           )))
     (dolist (nd new-descriptions)
       ;; ensure the target matches the whole string
       (push (cons (cons nil (concat "\\`" (car nd) "\\'")) (cons nil (cdr nd)))
@@ -460,18 +462,9 @@
   (push '(("\\(.*\\)C-c C-d C-d" . "elisp-slime-nav-describe-elisp-thing-at-point") . t)
           which-key-replacement-alist)
 
-  (dolist (leader-key `(,dotspacemacs-leader-key ,dotspacemacs-emacs-leader-key))
-    (which-key-add-key-based-replacements
-      (concat leader-key " m")    "major mode commands"
-      (concat leader-key " " dotspacemacs-emacs-command-key) "M-x"))
-
   (which-key-add-key-based-replacements
     dotspacemacs-leader-key '("root" . "Spacemacs root")
-    dotspacemacs-emacs-leader-key '("root" . "Spacemacs root")
-    (concat dotspacemacs-leader-key " m")
-    '("major-mode-cmd" . "Major mode commands")
-    (concat dotspacemacs-emacs-leader-key " m")
-    '("major-mode-cmd" . "Major mode commands"))
+    dotspacemacs-emacs-leader-key '("root" . "Spacemacs root"))
 
   ;; disable special key handling for spacemacs, since it can be
   ;; disorienting if you don't understand it
@@ -479,16 +472,6 @@
     (`right (which-key-setup-side-window-right))
     (`bottom (which-key-setup-side-window-bottom))
     (`right-then-bottom (which-key-setup-side-window-right-bottom)))
-
-  (setq which-key-special-keys nil
-        which-key-use-C-h-for-paging t
-        which-key-prevent-C-h-from-cycling t
-        which-key-echo-keystrokes 0.02
-        which-key-max-description-length 32
-        which-key-sort-order 'which-key-key-order-alpha
-        which-key-idle-delay dotspacemacs-which-key-delay
-        which-key-idle-secondary-delay 0.01
-        which-key-allow-evil-operators t)
 
   (which-key-mode)
   (spacemacs|diminish which-key-mode " Ⓚ" " K"))
@@ -499,6 +482,11 @@
   (use-package evil-evilified-state)
   (define-key evil-evilified-state-map (kbd dotspacemacs-leader-key)
     spacemacs-default-map))
+
+;; we own pcre2el here, so that it's always available to ivy and helm
+;; (necessary when using spacemacs-base distribution)
+(defun spacemacs-bootstrap/init-pcre2el ()
+  (use-package pcre2el :defer t))
 
 (defun spacemacs-bootstrap/init-holy-mode ()
   (use-package holy-mode
@@ -535,7 +523,6 @@
 (defun spacemacs-bootstrap/init-spacemacs-theme ()
   (use-package spacemacs-theme
     :defer t
-    :init
-    (progn
-      (setq spacemacs-theme-comment-bg t)
-      (setq spacemacs-theme-org-height t))))
+    :init (setq spacemacs-theme-keyword-italic t
+                spacemacs-theme-comment-bg t
+                spacemacs-theme-org-height t)))
